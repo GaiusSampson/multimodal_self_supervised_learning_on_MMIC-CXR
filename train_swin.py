@@ -61,8 +61,8 @@ def load_test_data(cxr_path, pretrained=True):
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--cxr_filepath', type=str, default='/data/cxr.h5', help="Directory to load chest x-ray image data from.")
-    parser.add_argument('--txt_filepath', type=str, default='/data/mimic_impressions.csv', help="Directory to load radiology report impressions text from.")
+    parser.add_argument('--cxr_filepath', type=str, default='data/cxr.h5', help="Directory to load chest x-ray image data from.")
+    parser.add_argument('--txt_filepath', type=str, default='data/mimic_impressions.csv', help="Directory to load radiology report impressions text from.")
     parser.add_argument('--batch_size', type=int, default=64)
     parser.add_argument('--epochs', type=int, default=4)  # total epochs to run
     parser.add_argument('--lr', type=float, default=5e-5)
@@ -74,7 +74,7 @@ def parse_args():
     parser.add_argument('--momentum', type=float, default=0.9)
     parser.add_argument('--rho', type=float, default=0.5)
     parser.add_argument('--eta', type=float, default=0.01)
-    parser.add_argument('--context_length', type=int, default=77)
+    parser.add_argument('--context_length', type=int, default=128)
     parser.add_argument('--random_init', action='store_true')
     parser.add_argument('--model_name', type=str, default="pt-imp")
     parser.add_argument('--run_dir', type=str, default=None)

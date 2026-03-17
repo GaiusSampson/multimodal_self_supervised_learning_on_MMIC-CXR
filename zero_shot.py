@@ -90,9 +90,9 @@ def load_clip(model_path, pretrained=False, context_length=77):
 
         model = CLIP(**params)
     else: 
-        model, preprocess = clip.load("RN50", device=device, jit=False) 
+        model, preprocess = clip.load("ViT-B/32", device=device, jit=False) 
     try: 
-        model.load_state_dict(torch.load(model_path, map_location=device))
+        model.load_state_dict(torch.load(model_path, map_location=device, weights_only=False))
     except: 
         print("Argument error. Set pretrained = True.", sys.exc_info()[0])
         raise

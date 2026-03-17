@@ -31,7 +31,175 @@ import torch.nn.functional as F
 from torch import nn
 
 from torchvision.models import swin_v2_b, swin_v2_s
-from transformers import AutoModel, AutoTokenizer
+from transformers import FlavaModel, FlavaProcessor, AutoModel, AutoTokenizer
+
+
+class FLAVAWrapper(nn.Module):
+    def __init__(self, embed_dim: int, use_biobert: bool = False,
+                 biobert_model: str = "emilyalsentzer/Bio_ClinicalBERT"):
+        super().__init__()
+
+        try:
+            from transformers import FlavaModel, FlavaProcessor
+        except ImportError:
+            raise ImportError(
+                "FLAVA requires transformers>=4.21.0. "
+                "Run: pip install transformers --upgrade"
+            )
+
+        try:
+            self.flava = FlavaModel.from_pretrained("facebook/flava-full")
+            self.processor = FlavaProcessor.from_pretrained(
+                "facebook/flava-full"
+            )
+        except OSError as e:
+            raise OSError(
+                f"Could not load facebook/flava-full. "
+                f"Check internet connection. Original error: {e}"
+            )
+
+        self.use_biobert = use_biobert
+        self.use_flava = True
+        self.embed_dim = embed_dim
+
+        if use_biobert:
+            biobert = AutoModel.from_pretrained(biobert_model)
+            self.flava.text_model = biobert
+            self.tokenizer = AutoTokenizer.from_pretrained(biobert_model)
+            self.context_length = 128
+        else:
+            self.tokenizer = self.processor.tokenizer
+            self.context_length = 128
+
+        # Unimodal projection heads (used for contrastive loss)
+        self.image_projection = nn.Linear(768, embed_dim)
+        self.text_projection = nn.Linear(768, embed_dim)
+
+        # Multimodal projection head (used for ITM and MLM)
+        self.multimodal_projection = nn.Linear(768, embed_dim)
+
+        self.logit_scale = nn.Parameter(
+            torch.ones([]) * np.log(1 / 0.07)
+        )
+
+
+    def encode_image(self, images):
+        """
+        Encode images using FLAVA unimodal image encoder.
+        Args:
+            images: pixel_values tensor [B, 3, 224, 224]
+        Returns:
+            image_features: [B, embed_dim]
+        """
+        if isinstance(images, dict):
+            pixel_values = images['pixel_values']
+        else:
+            pixel_values = images
+
+        outputs = self.flava.get_image_features(
+            pixel_values=pixel_values
+        )
+        # CLS token from unimodal image encoder
+        features = outputs.last_hidden_state[:, 0, :]  # [B, 768]
+        return self.image_projection(features)          # [B, embed_dim]
+
+    def encode_text(self, texts):
+        """
+        Encode texts using FLAVA unimodal text encoder.
+        Args:
+            texts: dict with input_ids, attention_mask [B, seq_len]
+        Returns:
+            text_features: [B, embed_dim]
+        """
+        outputs = self.flava.get_text_features(**texts)
+        # CLS token from unimodal text encoder
+        features = outputs.last_hidden_state[:, 0, :]  # [B, 768]
+        return self.text_projection(features)           # [B, embed_dim]
+
+
+
+    def encode_multimodal(
+        self,
+        pixel_values: torch.Tensor,
+        text_tokens: dict,
+    ) -> torch.Tensor:
+        """
+        Args:
+            pixel_values: [B, 3, 224, 224] in [0,1] range
+                        FLAVA forward pass applies normalisation internally
+            text_tokens:  dict with input_ids, attention_mask
+        """
+        outputs = self.flava(
+            input_ids=text_tokens['input_ids'],
+            attention_mask=text_tokens.get('attention_mask'),
+            token_type_ids=text_tokens.get('token_type_ids'),
+            pixel_values=pixel_values,
+            return_dict=True,
+        )
+
+        if outputs.multimodal_output is None:
+            raise ValueError(
+                "FLAVA multimodal output is None. "
+                "Ensure both pixel_values and input_ids "
+                "are passed correctly."
+            )
+
+        return outputs.multimodal_output.last_hidden_state
+
+    def encode_multimodal_cls(
+        self,
+        pixel_values: torch.Tensor,
+        text_tokens: dict,
+    ) -> torch.Tensor:
+        """
+        Convenience method returning only the multimodal CLS token,
+        projected to embed_dim. Useful for ITM head input.
+
+        Returns:
+            cls_features: [B, embed_dim]
+        """
+        sequence = self.encode_multimodal(pixel_values, text_tokens)
+        cls = sequence[:, 0, :]                    # [B, 768]
+        return self.multimodal_projection(cls)     # [B, embed_dim]
+
+
+    def forward(self, images, texts):
+        """
+        Standard forward pass for contrastive loss.
+        Same interface as CLIP so existing code works unchanged.
+        """
+        # Handle raw string input as safety net
+        if isinstance(texts, list) and isinstance(texts[0], str):
+            device = next(self.parameters()).device
+            tokens = self.tokenizer(
+                texts,
+                padding=True,
+                truncation=True,
+                max_length=self.context_length,
+                return_tensors="pt"
+            )
+            texts = {k: v.to(device) for k, v in tokens.items()}
+
+        image_features = self.encode_image(images)
+        text_features = self.encode_text(texts)
+
+        # Normalize
+        image_features = image_features / image_features.norm(
+            dim=-1, keepdim=True
+        )
+        text_features = text_features / text_features.norm(
+            dim=-1, keepdim=True
+        )
+
+        logit_scale = self.logit_scale.exp()
+        logits_per_image = (
+            logit_scale * image_features @ text_features.mT
+        )
+        logits_per_text = (
+            logit_scale * text_features @ image_features.mT
+        )
+
+        return logits_per_image, logits_per_text
 
 class BioClinicalBERTEncoder(nn.Module):
     """
@@ -326,7 +494,7 @@ class CLIP(nn.Module):
         
         self.swin_encoder = swin_encoder
         if swin_encoder:
-            self.visual = swin_v2_s(weights='IMAGENET1K_V1')
+            self.visual = swin_v2_b(weights='IMAGENET1K_V1')
             self.visual.head = nn.Linear(self.visual.head.in_features, embed_dim)
             
         else:

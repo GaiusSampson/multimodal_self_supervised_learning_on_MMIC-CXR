@@ -12,7 +12,7 @@ import torch
 from torch.utils import data
 from torch import nn
 import torch.optim as optim
-from torchvision.transforms import Compose, Normalize, Resize, InterpolationMode
+from torchvision.transforms import Compose, Normalize, Resize, InterpolationMode, Lambda
 
 import sys
 sys.path.append('../..')
@@ -20,7 +20,7 @@ sys.path.append('../..')
 import clip
 #CHANGE THIS TO MODEL WHEN RUNNING VIT/RN
 #KEEP AS SWIN_MODEL FOR SWIN AND BIOBERT
-from swin_model import CLIP
+from swin_model import CLIP, FLAVAWrapper
 from simple_tokenizer import SimpleTokenizer
 
 class CXRDataset(data.Dataset):
@@ -68,7 +68,7 @@ class CXRDataset(data.Dataset):
         
         return sample
 
-def load_data(cxr_filepath, txt_filepath, batch_size=4, column='report', pretrained=False, verbose=False): 
+def load_data(cxr_filepath, txt_filepath, batch_size=4, column='report', pretrained=False, verbose=False, flava=False): 
     
     dev = "cuda:0" 
     cuda_available = True
@@ -78,9 +78,18 @@ def load_data(cxr_filepath, txt_filepath, batch_size=4, column='report', pretrai
     if cuda_available: 
         torch.cuda.set_device(device)
 
+    if flava:
+        input_resolution = 224
+        transform = Compose([
+            Resize(input_resolution, interpolation=InterpolationMode.BICUBIC),
+            # Scale from CXR range to [0, 1]
+            Lambda(lambda x: (x - x.min()) / (x.max() - x.min() + 1e-8))
+        ])
+        print("Finished image transforms for FLAVA model.")
 
- #Vitb32
-    if pretrained: 
+
+
+    elif pretrained: 
         input_resolution = 224
         transform = Compose([
             Normalize((101.48761, 101.48761, 101.48761), (83.43944, 83.43944, 83.43944)),
@@ -91,12 +100,12 @@ def load_data(cxr_filepath, txt_filepath, batch_size=4, column='report', pretrai
 
    
 
-    else: 
+    """else: 
         input_resolution = 320
         transform = Compose([
             Normalize((101.48761, 101.48761, 101.48761), (83.43944, 83.43944, 83.43944)),
         ])
-        print("Finished image transforms for clip model.")
+        print("Finished image transforms for clip model.")"""
     
     torch_dset = CXRDataset(img_path=cxr_filepath,
                         txt_path=txt_filepath, column=column, transform=transform, pretrained=pretrained)
@@ -115,7 +124,7 @@ def load_data(cxr_filepath, txt_filepath, batch_size=4, column='report', pretrai
     return data_loader, device
     
 def load_clip(model_path=None, pretrained=False, context_length=77, swin_encoder=False, use_biobert=False, 
-              biobert_model="emilyalsentzer/Bio_ClinicalBERT"):
+              biobert_model="emilyalsentzer/Bio_ClinicalBERT", flava=False):
     '''
     FUNCTION: load_clip
     -------------------------------
@@ -132,10 +141,10 @@ def load_clip(model_path=None, pretrained=False, context_length=77, swin_encoder
     '''
 
     params = {
-        'embed_dim':1024, #768 vit 1024 rn50
-        'image_resolution': 320,
+        'embed_dim':768, #512 vit 1024 rn50
+        'image_resolution': 320, #288 RN 50X4
         'vision_layers': 12,
-        'vision_width': 1024,
+        'vision_width': 768, #512 vit 1024 rn50
         'vision_patch_size': 16,
         'context_length': context_length,
         'vocab_size': 49408,
@@ -146,12 +155,24 @@ def load_clip(model_path=None, pretrained=False, context_length=77, swin_encoder
     
     # set device 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+    if flava:
+        model = FLAVAWrapper(
+            embed_dim=768,
+            use_biobert=use_biobert,
+            biobert_model=biobert_model
+        )
+        model.use_flava = True
+        print(f"Loaded FLAVA with: "
+              f"{'BioClinicalBERT' if use_biobert else 'Standard BERT'}")
+
     
-    if pretrained: 
+    elif pretrained: 
         # load clip pre-trained model
-        model, preprocess = clip.load("RN50", device=device, jit=False)
+        model, preprocess = clip.load("ViT-B/32", device=device, jit=False)
         for param in model.parameters():
             param.data = param.data.float()
+        model.use_biobert = False
         print("Loaded in pretrained model.")
     else: 
         # Load custom CLIP with Swin and/or BioBERT
@@ -182,14 +203,26 @@ def preprocess_text(texts, model):
 #     if model.context_length is None: 
 #         model = model.module
 
- if model.use_biobert:
+    # FLAVA path
+ if hasattr(model, 'use_flava') and model.use_flava:
+        device = next(model.parameters()).device
+        tokens = model.tokenizer(
+            texts,
+            padding=True,
+            truncation=True,
+            max_length=model.context_length,
+            return_tensors="pt"
+        )
+        return {k: v.to(device) for k, v in tokens.items()}
+
+ elif model.use_biobert:
         # Use BERT tokenizer
         device = next(model.parameters()).device
         tokens = model.tokenizer(
             texts,
             padding=True,
             truncation=True,
-            max_length=512,  # BERT max length
+            max_length=128,  # enough to process the majority of reports
             return_tensors="pt"
         )
         # Move to device

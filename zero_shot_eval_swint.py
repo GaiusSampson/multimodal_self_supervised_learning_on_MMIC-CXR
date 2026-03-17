@@ -40,7 +40,7 @@ val_img_path = "./test_data/chexpert_val.h5"
 val_label_path = "./test_data/val.csv"
 
 # Checkpoints root (all .pt under here will be evaluated/ensembled)
-model_dir: str = './checkpoints/pt-imp'
+model_dir: str = './checkpoints'
 
 # Output dirs
 predictions_dir: Path = Path('./predictions')
@@ -67,7 +67,7 @@ cxr_labels: List[str] = [
     'No Finding','Pleural Effusion','Pleural Other','Pneumonia',
     'Pneumothorax','Support Devices'
 ]
-cxr_pair_template: Tuple[str, str] = ("A chest X-ray showing {}", "no {}")
+cxr_pair_template: Tuple[str, str] = ("{}", "no {}")
 
 # cxr_pair_template: Tuple[str] = (
 #     "There is evidence of {}.",
@@ -291,7 +291,7 @@ if __name__ == "__main__":
 
     # 2) Save averaged preds
     pred_path = predictions_dir / "chexpert_preds_swin_ensemble_all_best_ckpts_re.npy"
-    np.save(pred_path, y_pred_avg)
+    """np.save(pred_path, y_pred_avg)"""
     print(f"Saved ensemble preds to {pred_path}")
 
     # 3) AUC (per-label) on TEST

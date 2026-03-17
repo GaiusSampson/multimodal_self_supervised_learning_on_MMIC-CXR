@@ -27,7 +27,7 @@ from metrics import compute_f1_mcc
 # ----- DIRECTORIES ------ #
 cxr_filepath: str = './test_data/chexpert_test.h5' # filepath of chest x-ray images (.h5)
 cxr_true_labels_path: Optional[str] = './test_data/groundtruth.csv' # (optional for evaluation) if labels are provided, provide path
-model_dir: str = './checkpoints/' # where pretrained models are saved (.pt) 
+model_dir: str = './checkpointsViT/pt-imp' # where pretrained models are saved (.pt) 
 predictions_dir: Path = Path('./predictions') # where to save predictions
 cache_dir: str = predictions_dir / "cached" # where to cache ensembled predictions
 

@@ -54,7 +54,7 @@ tokenizers==0.22.2
 torch==2.11.0.dev20260214+cu128
 torchvision==0.26.0.dev20260214+cu128
 tqdm==4.67.3
-transformers==5.1.0
+transformers==5.2.0
 typer==0.23.1
 typer-slim==0.23.1
 typing_extensions==4.15.0

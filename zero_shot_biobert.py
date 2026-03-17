@@ -81,7 +81,7 @@ def tokenize_text(texts, model, context_length=77):
             texts,
             padding=True,
             truncation=True,
-            max_length=512,  # BERT max length
+            max_length=128,  # BERT max length
             return_tensors="pt"
         )
         # Move to device
