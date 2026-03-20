@@ -9,7 +9,7 @@ This project aims to test different implementations of models against the MMIC-C
 
 
 ### how to use
-Download the project files and and install the dependancies by running "python -m pip install -r requirements.txt". Download the MMIC-CXR datastet from https://physionet.org/content/mimic-cxr-jpg/2.0.0/ and run run_preprocess.py and make sure you add the paths to where you downloaded the dataset. For the test datset download the CheXpert test set from https://aimi.stanford.edu/chexpert-chest-x-rays and for the validation set download the padchest dataset from https://bimcv.cipf.es/bimcv-projects/padchest and put the .h5 and csv files in the test_data directory
+Download the project files and and install the dependancies by running "python -m pip install -r requirements.txt". Download the MMIC-CXR datastet from https://physionet.org/content/mimic-cxr-jpg/2.0.0/ and run run_preprocess.py and make sure you add the paths to where you downloaded the dataset. For the validation datset download the CheXpert set from https://aimi.stanford.edu/chexpert-chest-x-rays and get the validation set. For the test set download it from from https://github.com/rajpurkarlab/cheXpert-test-set-labels and put the .h5 and csv files from both in the test_data directory
 
 To run the standard CLIP text enconder with ViT or RN edit the model name in train.py at line 149 to either "ViT-B/32" or "RN50". In train.py make sure the embed dimension is 512 for ViT or 1024 for Resnet
 
