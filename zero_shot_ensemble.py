@@ -16,18 +16,14 @@ import h5py
 from torchvision.transforms.functional import to_pil_image
 from torchvision.transforms import Compose, Resize, CenterCrop, InterpolationMode, Normalize, Lambda
 
-# Your project helpers
+
 from zero_shot import make_true_labels
 from eval import evaluate, bootstrap
 from metrics import compute_f1, compute_mcc, get_best_p_vals
 
-# timm for Swin transforms
-try:
-    from timm.data import resolve_data_config
-    HAS_TIMM = True
-except ImportError:
-    HAS_TIMM = False
-    print("Warning: timm not found. Swin models may not work optimally.")
+
+from timm.data import resolve_data_config
+
 
 
 def parse_args():
@@ -445,38 +441,32 @@ def get_eval_transform(model, architecture_hint: str):
     Return the appropriate preprocessing transform for the given architecture.
     """
     if architecture_hint in ('swin', 'swin_biobert'):
-        if HAS_TIMM:
-            backbone = model.visual if hasattr(model, 'visual') else model
-            timm_cfg = resolve_data_config({}, model=backbone)
+        backbone = model.visual if hasattr(model, 'visual') else model
+        timm_cfg = resolve_data_config({}, model=backbone)
 
-            H, W = timm_cfg["input_size"][1], timm_cfg["input_size"][2]
-            crop_pct = timm_cfg.get("crop_pct", 1.0)
-            interp_str = (timm_cfg.get("interpolation", "bicubic") or "bicubic").lower()
-            interp_map = {
-                "bicubic": InterpolationMode.BICUBIC,
-                "bilinear": InterpolationMode.BILINEAR,
-                "nearest": InterpolationMode.NEAREST,
-            }
-            interp = interp_map.get(interp_str, InterpolationMode.BICUBIC)
+        H, W = timm_cfg["input_size"][1], timm_cfg["input_size"][2]
+        crop_pct = timm_cfg.get("crop_pct", 1.0)
+        interp_str = (timm_cfg.get("interpolation", "bicubic") or "bicubic").lower()
+        interp_map = {
+            "bicubic": InterpolationMode.BICUBIC,
+            "bilinear": InterpolationMode.BILINEAR,
+            "nearest": InterpolationMode.NEAREST,
+        }
+        interp = interp_map.get(interp_str, InterpolationMode.BICUBIC)
 
-            if crop_pct and crop_pct < 1.0:
-                resize_h = int(math.floor(H / crop_pct))
-                resize_w = int(math.floor(W / crop_pct))
-            else:
-                resize_h, resize_w = H, W
-
-            return Compose([
-                Lambda(lambda t: t / 255.0),
-                Resize((resize_h, resize_w), interpolation=interp),
-                CenterCrop((H, W)),
-                Normalize(mean=timm_cfg["mean"], std=timm_cfg["std"]),
-            ])
+        if crop_pct and crop_pct < 1.0:
+            resize_h = int(math.floor(H / crop_pct))
+            resize_w = int(math.floor(W / crop_pct))
         else:
-            return Compose([
-                Lambda(lambda t: t / 255.0),
-                Resize((224, 224), interpolation=InterpolationMode.BICUBIC),
-                Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-            ])
+            resize_h, resize_w = H, W
+
+        return Compose([
+            Lambda(lambda t: t / 255.0),
+            Resize((resize_h, resize_w), interpolation=interp),
+            CenterCrop((H, W)),
+            Normalize(mean=timm_cfg["mean"], std=timm_cfg["std"]),
+        ])
+       
 
     elif architecture_hint == 'vit':
         img_res = model.image_resolution if hasattr(model, 'image_resolution') else 224

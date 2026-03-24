@@ -144,11 +144,6 @@ def get_timm_eval_transform_from_model(model):
 
 
 class GPUAdapter(nn.Module):
-    """
-    Wraps your CLIP model so encode_image/encode_text run on GPU,
-    but return CPU tensors for downstream numpy code.
-    Also forwards attribute access to handle BioBERT-specific attributes.
-    """
     def __init__(self, base_model: nn.Module, device: torch.device):
         super().__init__()
         self.base = base_model.to(device).eval()
@@ -383,7 +378,7 @@ if __name__ == "__main__":
     # 2) Save averaged predictions
     pred_path = predictions_dir / "chexpert_preds_swin_biobert_ensemble.npy"
     np.save(pred_path, y_pred_avg)
-    print(f"\n✓ Saved ensemble predictions to {pred_path}")
+    print(f"\nSaved ensemble predictions to {pred_path}")
 
     # 3) AUC (per-label) on TEST
     print("\n" + "="*60)
@@ -399,7 +394,7 @@ if __name__ == "__main__":
     print(auc_df)
     
     mean_auc = auc_df.mean(axis=1)[0]
-    print(f"\n✓ Mean AUC: {mean_auc:.4f}")
+    print(f"\nMean AUC: {mean_auc:.4f}")
 
     # 4) AUC 95% CI (bootstrap) on TEST
     print("\n" + "="*60)
@@ -412,7 +407,7 @@ if __name__ == "__main__":
     
     auc_ci_csv = predictions_dir / "chexpert_auc_swin_biobert.csv"
     auc_ci_df.to_csv(auc_ci_csv, index=True)
-    print(f"\n✓ Saved AUC with CI to: {auc_ci_csv}")
+    print(f"\nSaved AUC with CI to: {auc_ci_csv}")
 
     # 5) Thresholds from VAL → F1 & MCC on TEST
     if os.path.exists(val_img_path) and os.path.exists(val_label_path):

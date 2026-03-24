@@ -1,10 +1,3 @@
-# zero_shot_eval_swint.py
-# Zero-shot evaluation for Swin-CLIP using your existing codebase (no edits to original modules).
-# - Uses timm-derived eval transform (Option A)
-# - GPU acceleration via a minimal adapter (returns CPU tensors so zero_shot works unchanged)
-# - Batch size = 1 to match zero_shot.predict()'s squeeze behavior
-# - Computes AUC (+95% CI), F1, MCC (thresholds from val set)
-
 import os
 import math
 import sys
@@ -13,7 +6,7 @@ import pandas as pd
 from pathlib import Path
 from typing import List, Tuple, Optional
 
-sys.path.append('../')  # adjust if your project layout differs
+sys.path.append('../') 
 
 import torch
 import torch.nn as nn
@@ -21,13 +14,13 @@ from torch.utils.data import Dataset, DataLoader
 import h5py
 from torchvision.transforms import Compose, Resize, CenterCrop, InterpolationMode, Normalize, Lambda
 
-# Your project helpers
+
 from train import load_clip as load_swin_clip
 from zero_shot import run_softmax_eval, make_true_labels
 from eval import evaluate, bootstrap
 from metrics import compute_f1, compute_mcc, get_best_p_vals
 
-# timm for Option A transform
+
 from timm.data import resolve_data_config
 
 # ===================== CONFIG =====================
@@ -39,7 +32,7 @@ cxr_true_labels_path: Optional[str] = './test_data/groundtruth.csv'
 val_img_path = "./test_data/chexpert_val.h5"
 val_label_path = "./test_data/val.csv"
 
-# Checkpoints root (all .pt under here will be evaluated/ensembled)
+# Checkpoints root 
 model_dir: str = './checkpoints'
 
 # Output dirs
@@ -99,7 +92,7 @@ print(f"Found {len(model_paths)} checkpoints")
 for p in model_paths:
     print(" -", p)
 
-# ================= Dataset (HDF5 -> tensor) =================
+
 class CXRTestDataset(Dataset):
     def __init__(self, img_path: str, transform=None):
         self.f = h5py.File(img_path, 'r')
@@ -107,17 +100,16 @@ class CXRTestDataset(Dataset):
         self.transform = transform
     def __len__(self): return len(self.imgs)
     def __getitem__(self, idx):
-        x = self.imgs[idx]                 # (H, W) grayscale, typically 0..255
-        x = np.repeat(x[None, ...], 3, 0)  # (3, H, W)
+        x = self.imgs[idx]                
+        x = np.repeat(x[None, ...], 3, 0)  
         x = torch.from_numpy(x).float()
         return {'img': self.transform(x) if self.transform else x}
     def __del__(self):
         try: self.f.close()
         except: pass
 
-# ============== timm-driven eval transform (Option A) ==============
+# ============== timm-driven eval transform ==============
 def _get_backbone_for_timm(model):
-    # Try common attribute names used in CLIP wrappers
     for attr in ("image_encoder", "visual", "vision_model", "image_model", "backbone"):
         if hasattr(model, attr):
             return getattr(model, attr)
@@ -155,10 +147,10 @@ def get_timm_eval_transform_from_model(model):
         Normalize(mean=cfg["mean"], std=cfg["std"]),
     ])
 
-# ============== GPU adapter (no changes to zero_shot.py) ==============
+# ============== GPU adapter  ==============
 class GPUAdapter(nn.Module):
     """
-    Wraps your CLIP model so encode_image/encode_text run on GPU,
+    Wraps the CLIP model so encode_image/encode_text run on GPU,
     but return CPU tensors for downstream numpy code.
     """
     def __init__(self, base_model: nn.Module, device: torch.device):
@@ -196,7 +188,6 @@ def make_swin(model_path: str, cxr_h5: str, context_length: int):
     )
     
     def load_any_state_dict(path, device='cpu'):
-        # use weights_only=True if your torch has it (silences the warning)
         try:
             obj = torch.load(path, map_location=device, weights_only=True)
         except TypeError:
@@ -208,15 +199,14 @@ def make_swin(model_path: str, cxr_h5: str, context_length: int):
 
     state = load_any_state_dict(model_path, device='cpu')
 
-    # Use strict=True if you’re certain the architecture & context_length match.
-    # While debugging, strict=False helps you see mismatches without crashing.
+
     missing_unexpected = base.load_state_dict(state, strict=False)
     print("Missing:", missing_unexpected.missing_keys)
     print("Unexpected:", missing_unexpected.unexpected_keys)
 
     base.eval()
 
-    # timm-derived eval transform
+
     transform = get_timm_eval_transform_from_model(base)
 
     # Optional GPU wrapping (compute on GPU, return CPU tensors)
@@ -231,14 +221,14 @@ def make_swin(model_path: str, cxr_h5: str, context_length: int):
     dset = CXRTestDataset(cxr_h5, transform=transform)
     loader = DataLoader(
         dset,
-        batch_size=batch_size,   # keep 1 to match zero_shot.predict()
+        batch_size=batch_size,   
         shuffle=False,
-        num_workers=num_workers, # 0 recommended for h5py
+        num_workers=num_workers, 
         pin_memory=pin
     )
     return model, loader
 
-# ================= Ensemble (unchanged interface) =================
+# ================= Ensemble =================
 def ensemble_models(
     model_paths: List[str],
     cxr_h5: str,
