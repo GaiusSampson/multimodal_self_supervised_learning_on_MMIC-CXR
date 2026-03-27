@@ -23,6 +23,26 @@ For FLAVA with bioclinicalbert use the --use_biobert flag with FLAVA.
 
 To evaluate model checkpionts you can use the individual run_zeroshot files or just use the universal ensemble. To do so put the model checkpoints in the matching directory in best_models and run zero_shot_ensemble.py. This can also be used to ensemble different model checkpoints together as long as they are in the correct subdirectory in best_models.
 
+### Checkpoints
+
+all of the model checkpoints from my experiments can be found below
+
+https://drive.google.com/file/d/1JcB55_SyYyDjC9J-qLk4US2G9jz5o2cT/view?usp=sharing
+
+https://drive.google.com/file/d/1wxnJ78tF90lU_Cu65H_qxDPFC3BpIUcY/view?usp=sharing
+
+https://drive.google.com/file/d/1bNuF4CVVJLIZmKn6Q0qK206u5_FSXQPa/view?usp=sharing
+
+https://drive.google.com/file/d/1uA271rkm4jgBMm-1Tyg76j8EfDGLV17n/view?usp=sharing
+
+https://drive.google.com/file/d/1B7PMdQVcKn4eNjTX8WyyYEdvxC_YLWaj/view?usp=sharing
+
+https://drive.google.com/file/d/1VzNRq9VqpEF2OeQqp34hRYthPisXLvJW/view?usp=sharing
+
+https://drive.google.com/file/d/1pcKfZlFbMsjbIHh0L6o9SEn5zv0-PFpr/view?usp=sharing
+
+
+
 ### disclaimer
 
 Not all of the code in this project was created by me it is an adaptation of the original chexzero implementation from https://github.com/rajpurkarlab/CheXzero with some further contibutions from my acedemic supervisor
